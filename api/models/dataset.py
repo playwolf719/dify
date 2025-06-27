@@ -360,6 +360,7 @@ class Document(db.Model):  # type: ignore[name-defined]
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     doc_type = db.Column(db.String(40), nullable=True)
     doc_metadata = db.Column(JSONB, nullable=True)
+    metainfo = db.Column(JSONB, nullable=True)
     doc_form = db.Column(db.String(255), nullable=False, server_default=db.text("'text_model'::character varying"))
     doc_language = db.Column(db.String(255), nullable=True)
 
