@@ -886,6 +886,7 @@ class DocumentService:
         account: Account | Any,
         dataset_process_rule: Optional[DatasetProcessRule] = None,
         created_from: str = "web",
+        metainfo = None,
     ):
         # check document limit
         features = FeatureService.get_features(current_user.current_tenant_id)
@@ -1042,6 +1043,7 @@ class DocumentService:
                             account,
                             file_name,
                             batch,
+                            metainfo,
                         )
                         db.session.add(document)
                         db.session.flush()
@@ -1099,6 +1101,7 @@ class DocumentService:
                                     account,
                                     truncated_page_name,
                                     batch,
+                                    metainfo,
                                 )
                                 db.session.add(document)
                                 db.session.flush()
@@ -1139,6 +1142,7 @@ class DocumentService:
                             account,
                             document_name,
                             batch,
+                            metainfo,
                         )
                         db.session.add(document)
                         db.session.flush()
@@ -1176,6 +1180,7 @@ class DocumentService:
         account: Account,
         name: str,
         batch: str,
+        metainfo = None,
     ):
         document = Document(
             tenant_id=dataset.tenant_id,
@@ -1190,6 +1195,7 @@ class DocumentService:
             created_by=account.id,
             doc_form=document_form,
             doc_language=document_language,
+            metainfo=metainfo,  
         )
         doc_metadata = {}
         if dataset.built_in_field_enabled:

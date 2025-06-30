@@ -167,6 +167,8 @@ class DocumentAddByFileApi(DatasetApiResource):
             args["doc_form"] = "text_model"
         if "doc_language" not in args:
             args["doc_language"] = "English"
+        # Get metainfo from args if provided
+        metainfo = args.get("metainfo", None)
 
         # get dataset info
         dataset_id = str(dataset_id)
@@ -213,6 +215,7 @@ class DocumentAddByFileApi(DatasetApiResource):
                 account=dataset.created_by_account,
                 dataset_process_rule=dataset.latest_process_rule if "process_rule" not in args else None,
                 created_from="api",
+                metainfo=metainfo,
             )
         except ProviderTokenNotInitError as ex:
             raise ProviderNotInitializeError(ex.description)

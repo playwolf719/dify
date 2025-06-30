@@ -71,12 +71,12 @@ class IndexingRunner:
 
                 # transform
                 documents = self._transform(
-                    index_processor, dataset, text_docs, dataset_document.doc_language, processing_rule.to_dict()
+                    index_processor, dataset, text_docs, dataset_document.doc_language, processing_rule.to_dict(), dataset_document
                 )
                 # save segment
                 self._load_segments(dataset, dataset_document, documents)
 
-                # load
+                # load (make segement and add to vector store)
                 self._load(
                     index_processor=index_processor,
                     dataset=dataset,
@@ -135,7 +135,7 @@ class IndexingRunner:
 
             # transform
             documents = self._transform(
-                index_processor, dataset, text_docs, dataset_document.doc_language, processing_rule.to_dict()
+                index_processor, dataset, text_docs, dataset_document.doc_language, processing_rule.to_dict(), dataset_document
             )
             # save segment
             self._load_segments(dataset, dataset_document, documents)
@@ -405,7 +405,6 @@ class IndexingRunner:
             if text_doc.metadata is not None:
                 text_doc.metadata["document_id"] = dataset_document.id
                 text_doc.metadata["dataset_id"] = dataset_document.dataset_id
-
         return text_docs
 
     @staticmethod
@@ -679,6 +678,7 @@ class IndexingRunner:
         DocumentSegment.query.filter_by(document_id=dataset_document_id).update(update_params)
         db.session.commit()
 
+    # Transform the text documents into segments
     def _transform(
         self,
         index_processor: BaseIndexProcessor,
@@ -686,6 +686,7 @@ class IndexingRunner:
         text_docs: list[Document],
         doc_language: str,
         process_rule: dict,
+        dataset_document: Optional[DatasetDocument] = None,
     ) -> list[Document]:
         # get embedding model instance
         embedding_model_instance = None
@@ -710,9 +711,12 @@ class IndexingRunner:
             tenant_id=dataset.tenant_id,
             doc_language=doc_language,
         )
-
+        for item in documents:
+            if dataset_document:
+                item.metainfo = dataset_document.metainfo or {}
         return documents
 
+    # save segments to db
     def _load_segments(self, dataset, dataset_document, documents):
         # save node to document segment
         doc_store = DatasetDocumentStore(

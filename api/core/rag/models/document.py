@@ -29,6 +29,8 @@ class Document(BaseModel):
         documents, etc.).
     """
     metadata: dict = {}
+    """metainfo about the document, such as filename."""
+    metainfo: dict = {}
 
     provider: Optional[str] = "dify"
 

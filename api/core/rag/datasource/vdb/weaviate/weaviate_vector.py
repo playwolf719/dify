@@ -100,9 +100,9 @@ class WeaviateVector(BaseVector):
         uuids = self._get_uuids(documents)
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
+        metainfos = [d.metainfo for d in documents]
 
         ids = []
-
         with self._client.batch as batch:
             for i, text in enumerate(texts):
                 data_properties = {Field.TEXT_KEY.value: text}
@@ -110,7 +110,10 @@ class WeaviateVector(BaseVector):
                     # metadata maybe None
                     for key, val in (metadatas[i] or {}).items():
                         data_properties[key] = self._json_serializable(val)
-
+                if metainfos:
+                    for key, val in (metainfos[i] or {}).items():
+                        if key in ["filename"]:
+                            data_properties[key] = self._json_serializable(val)
                 batch.add_data_object(
                     data_object=data_properties,
                     class_name=self._collection_name,
@@ -263,7 +266,11 @@ class WeaviateVector(BaseVector):
                 {
                     "name": "text",
                     "dataType": ["text"],
-                }
+                },
+                {
+                    "name": "filename",
+                    "dataType": ["text"],
+                },
             ],
         }
 

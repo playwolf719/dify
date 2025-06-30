@@ -1,18 +1,19 @@
 # base image
-FROM python:3.12-slim-bookworm AS base
+FROM crpi-7pbvq1eixd9nit76-vpc.cn-hangzhou.personal.cr.aliyuncs.com/szailab/labhub:python-3.12-slim-bookworm AS base
 
 WORKDIR /app/api
 
 # Install uv
 ENV UV_VERSION=0.6.14
 
-RUN pip install --no-cache-dir uv==${UV_VERSION}
+RUN pip install --no-cache-dir uv==${UV_VERSION} -i https://mirrors.aliyun.com/pypi/simple
 
 
 FROM base AS packages
 
 # if you located in China, you can use aliyun mirror to speed up
 # RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
+
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc g++ libc-dev libffi-dev libgmp-dev libmpfr-dev libmpc-dev
