@@ -28,12 +28,15 @@ class HitTestingService:
         retrieval_model: Any,  # FIXME drop this any
         external_retrieval_model: dict,
         limit: int = 10,
+        custom_filter: dict = None,
     ) -> dict:
         start = time.perf_counter()
 
         # get retrieval model , if the model is not setting , using default
         if not retrieval_model:
             retrieval_model = dataset.retrieval_model or default_retrieval_model
+        
+        
 
         all_documents = RetrievalService.retrieve(
             retrieval_method=retrieval_model.get("search_method", "semantic_search"),
@@ -48,6 +51,7 @@ class HitTestingService:
             else None,
             reranking_mode=retrieval_model.get("reranking_mode") or "reranking_model",
             weights=retrieval_model.get("weights", None),
+            custom_filter=custom_filter,
         )
 
         end = time.perf_counter()
@@ -99,7 +103,6 @@ class HitTestingService:
     @classmethod
     def compact_retrieve_response(cls, query: str, documents: list[Document]):
         records = RetrievalService.format_retrieval_documents(documents)
-
         return {
             "query": {
                 "content": query,

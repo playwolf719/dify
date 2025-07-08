@@ -42,6 +42,7 @@ class RetrievalService:
         reranking_mode: str = "reranking_model",
         weights: Optional[dict] = None,
         document_ids_filter: Optional[list[str]] = None,
+        custom_filter: Optional[dict] = None,
     ):
         if not query:
             return []
@@ -82,6 +83,7 @@ class RetrievalService:
                         retrieval_method=retrieval_method,
                         exceptions=exceptions,
                         document_ids_filter=document_ids_filter,
+                        custom_filter=custom_filter,
                     )
                 )
             if RetrievalMethod.is_support_fulltext_search(retrieval_method):
@@ -98,6 +100,7 @@ class RetrievalService:
                         retrieval_method=retrieval_method,
                         exceptions=exceptions,
                         document_ids_filter=document_ids_filter,
+                        custom_filter=custom_filter,
                     )
                 )
             concurrent.futures.wait(futures, timeout=30, return_when=concurrent.futures.ALL_COMPLETED)
@@ -171,6 +174,7 @@ class RetrievalService:
         retrieval_method: str,
         exceptions: list,
         document_ids_filter: Optional[list[str]] = None,
+        custom_filter: Optional[dict] = None,
     ):
         with flask_app.app_context():
             try:
@@ -186,6 +190,7 @@ class RetrievalService:
                     score_threshold=score_threshold,
                     filter={"group_id": [dataset.id]},
                     document_ids_filter=document_ids_filter,
+                    custom_filter=custom_filter,
                 )
 
                 if documents:
@@ -224,6 +229,7 @@ class RetrievalService:
         retrieval_method: str,
         exceptions: list,
         document_ids_filter: Optional[list[str]] = None,
+        custom_filter: Optional[dict] = None,
     ):
         with flask_app.app_context():
             try:
@@ -234,7 +240,10 @@ class RetrievalService:
                 vector_processor = Vector(dataset=dataset)
 
                 documents = vector_processor.search_by_full_text(
-                    cls.escape_query_for_search(query), top_k=top_k, document_ids_filter=document_ids_filter
+                    cls.escape_query_for_search(query), 
+                    top_k=top_k, 
+                    document_ids_filter=document_ids_filter,
+                    custom_filter=custom_filter,
                 )
                 if documents:
                     if (
@@ -297,7 +306,7 @@ class RetrievalService:
                 dataset_document = dataset_documents[document_id]
                 if not dataset_document:
                     continue
-
+                
                 if dataset_document.doc_form == IndexType.PARENT_CHILD_INDEX:
                     # Handle parent-child documents
                     child_index_node_id = document.metadata.get("doc_id")
@@ -345,6 +354,7 @@ class RetrievalService:
                         segment_child_map[segment.id] = map_detail
                         record = {
                             "segment": segment,
+                            "metainfo": document.metainfo,
                         }
                         records.append(record)
                     else:
@@ -382,6 +392,7 @@ class RetrievalService:
                     record = {
                         "segment": segment,
                         "score": document.metadata.get("score"),  # type: ignore
+                        "metainfo": document.metainfo,
                     }
                     records.append(record)
 
@@ -390,7 +401,6 @@ class RetrievalService:
                 if record["segment"].id in segment_child_map:
                     record["child_chunks"] = segment_child_map[record["segment"].id].get("child_chunks")  # type: ignore
                     record["score"] = segment_child_map[record["segment"].id]["max_score"]
-
             return [RetrievalSegments(**record) for record in records]
         except Exception as e:
             db.session.rollback()

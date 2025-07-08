@@ -16,6 +16,7 @@ from core.rag.models.document import Document
 from extensions.ext_redis import redis_client
 from models.dataset import Dataset
 
+import logging
 
 class WeaviateConfig(BaseModel):
     endpoint: str
@@ -181,36 +182,61 @@ class WeaviateVector(BaseVector):
                     # tolerate not found error
                     if e.status_code != 404:
                         raise e
+                    
+    def handle_metainfo(self,one):
+        metainfo = {}
+        metainfo_flist = self.make_prop_list()
+        for fname in metainfo_flist:
+            if fname in one:
+                metainfo[fname] = one.get(fname,None)
+        return metainfo
 
+    def make_prop_list(self):
+        tlist = []
+        for item in self._default_schema("tmp")["properties"]:
+            if item["name"] not in [Field.TEXT_KEY.value]:
+                tlist.append(item["name"])
+        return tlist
+    
     def search_by_vector(self, query_vector: list[float], **kwargs: Any) -> list[Document]:
         """Look up similar documents by embedding vector in Weaviate."""
         collection_name = self._collection_name
         properties = self._attributes
         properties.append(Field.TEXT_KEY.value)
+        properties.extend(self.make_prop_list())
         query_obj = self._client.query.get(collection_name, properties)
 
         vector = {"vector": query_vector}
         document_ids_filter = kwargs.get("document_ids_filter")
+        custom_filter = kwargs.get("custom_filter",{})
+        where_filter = {}
         if document_ids_filter:
             operands = []
             for document_id_filter in document_ids_filter:
                 operands.append({"path": ["document_id"], "operator": "Equal", "valueText": document_id_filter})
             where_filter = {"operator": "Or", "operands": operands}
             query_obj = query_obj.with_where(where_filter)
+        if custom_filter:
+            if where_filter:
+                where_filter["operands"].extend(custom_filter["operands"])
+            else:
+                where_filter = custom_filter
+            query_obj = query_obj.with_where(where_filter)
+        query_obj = query_obj.with_near_vector(vector).with_limit(kwargs.get("top_k", 4)).with_additional(["vector", "distance"])
         result = (
-            query_obj.with_near_vector(vector)
-            .with_limit(kwargs.get("top_k", 4))
-            .with_additional(["vector", "distance"])
+            query_obj
             .do()
         )
         if "errors" in result:
             raise ValueError(f"Error during query: {result['errors']}")
 
         docs_and_scores = []
+        logging.info(f"search_by_vector : count: {len(result["data"]["Get"][collection_name])}")
         for res in result["data"]["Get"][collection_name]:
             text = res.pop(Field.TEXT_KEY.value)
             score = 1 - res["_additional"]["distance"]
-            docs_and_scores.append((Document(page_content=text, metadata=res), score))
+            metainfo = self.handle_metainfo(res)
+            docs_and_scores.append((Document(page_content=text, metadata=res, metainfo=metainfo), score))
 
         docs = []
         for doc, score in docs_and_scores:
@@ -236,27 +262,41 @@ class WeaviateVector(BaseVector):
         collection_name = self._collection_name
         content: dict[str, Any] = {"concepts": [query]}
         properties = self._attributes
+        # get props
         properties.append(Field.TEXT_KEY.value)
+        properties.extend(self.make_prop_list())
         if kwargs.get("search_distance"):
             content["certainty"] = kwargs.get("search_distance")
         query_obj = self._client.query.get(collection_name, properties)
         document_ids_filter = kwargs.get("document_ids_filter")
+        custom_filter = kwargs.get("custom_filter",{})
+        where_filter = {}
         if document_ids_filter:
             operands = []
             for document_id_filter in document_ids_filter:
                 operands.append({"path": ["document_id"], "operator": "Equal", "valueText": document_id_filter})
             where_filter = {"operator": "Or", "operands": operands}
             query_obj = query_obj.with_where(where_filter)
+        if custom_filter:
+            if where_filter:
+                where_filter["operands"].extend(custom_filter["operands"])
+            else:
+                where_filter = custom_filter
+            query_obj = query_obj.with_where(where_filter)
         query_obj = query_obj.with_additional(["vector"])
+        # bm25 query prop
         properties = ["text"]
-        result = query_obj.with_bm25(query=query, properties=properties).with_limit(kwargs.get("top_k", 4)).do()
+        query_obj = query_obj.with_bm25(query=query, properties=properties).with_limit(kwargs.get("top_k", 4))
+        result = query_obj.do()
         if "errors" in result:
             raise ValueError(f"Error during query: {result['errors']}")
         docs = []
+        logging.info(f"search_by_full_text : {query_obj.build()} count: {len(result['data']['Get'][collection_name])}")
         for res in result["data"]["Get"][collection_name]:
             text = res.pop(Field.TEXT_KEY.value)
             additional = res.pop("_additional")
-            docs.append(Document(page_content=text, vector=additional["vector"], metadata=res))
+            metainfo = self.handle_metainfo(res)
+            docs.append(Document(page_content=text, vector=additional["vector"], metadata=res, metainfo=metainfo))
         return docs
 
     def _default_schema(self, index_name: str) -> dict:

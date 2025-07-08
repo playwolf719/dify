@@ -21,3 +21,4 @@ class RetrievalSegments(BaseModel):
     segment: DocumentSegment
     child_chunks: Optional[list[RetrievalChildChunk]] = None
     score: Optional[float] = None
+    metainfo: Optional[dict] = None

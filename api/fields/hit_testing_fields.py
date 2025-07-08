@@ -43,9 +43,14 @@ child_chunk_fields = {
     "score": fields.Float,
 }
 
+metainfo_fields = {
+    "filename": fields.String,
+}
+
 hit_testing_record_fields = {
     "segment": fields.Nested(segment_fields),
     "child_chunks": fields.List(fields.Nested(child_chunk_fields)),
     "score": fields.Float,
     "tsne_position": fields.Raw,
+    "metainfo": fields.Nested(metainfo_fields),
 }
